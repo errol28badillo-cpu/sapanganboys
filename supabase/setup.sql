@@ -154,6 +154,29 @@ grant insert, update, delete on public.categories to authenticated;
 grant select on public.site_content to anon, authenticated;
 grant insert, update, delete on public.site_content to authenticated;
 
+-- Enable Supabase Realtime for public profiles and editable site text.
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_rel pr
+    join pg_publication p on p.oid = pr.prpubid
+    join pg_class c on c.oid = pr.prrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    where p.pubname = 'supabase_realtime' and n.nspname = 'public' and c.relname = 'profiles'
+  ) then
+    alter publication supabase_realtime add table public.profiles;
+  end if;
+  if not exists (
+    select 1 from pg_publication_rel pr
+    join pg_publication p on p.oid = pr.prpubid
+    join pg_class c on c.oid = pr.prrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    where p.pubname = 'supabase_realtime' and n.nspname = 'public' and c.relname = 'site_content'
+  ) then
+    alter publication supabase_realtime add table public.site_content;
+  end if;
+end $$;
+
 do $$
 begin
   if not exists (select 1 from storage.buckets where id = 'profile-images') then

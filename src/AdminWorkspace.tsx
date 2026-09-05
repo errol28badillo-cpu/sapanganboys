@@ -23,7 +23,16 @@ export default function AdminWorkspace() {
     setProfiles((profileRows || []) as Profile[])
     setContent(Object.fromEntries(((contentRows || []) as SiteContent[]).map(row => [row.key, row.value])))
   }
-  useEffect(() => { void load() }, [])
+  useEffect(() => {
+    void load()
+    const client = supabase
+    if (!client) return
+    const channel = client.channel('admin-workspace-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => { void load() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'site_content' }, () => { void load() })
+      .subscribe()
+    return () => { void client.removeChannel(channel) }
+  }, [])
   const editProfile = (profile?: Profile) => {
     setEditorOpen(true)
     setEditing(profile || null)

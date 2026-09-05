@@ -11,6 +11,17 @@ export const defaultSiteContent = {
 
 export function useSiteContent() {
   const [content, setContent] = useState(defaultSiteContent)
-  useEffect(() => { if (supabase) supabase.from('site_content').select('key,value').then(({ data }) => { if (data) setContent(current => ({ ...current, ...Object.fromEntries(data.map(row => [row.key, row.value])) })) }) }, [])
+  useEffect(() => {
+    const client = supabase
+    if (!client) return
+    let active = true
+    const load = async () => {
+      const { data } = await client.from('site_content').select('key,value')
+      if (active && data) setContent(current => ({ ...current, ...Object.fromEntries(data.map(row => [row.key, row.value])) }))
+    }
+    void load()
+    const channel = client.channel('public-site-content-live').on('postgres_changes', { event: '*', schema: 'public', table: 'site_content' }, () => { void load() }).subscribe()
+    return () => { active = false; void client.removeChannel(channel) }
+  }, [])
   return content
 }

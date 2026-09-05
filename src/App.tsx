@@ -12,7 +12,19 @@ const formatDate = (date: string) => new Intl.DateTimeFormat('en-PH', { month: '
 
 function useProfiles() {
   const [items, setItems] = useState<Profile[]>(seedProfiles)
-  useEffect(() => { if (supabase) supabase.from('profiles').select('*, category:categories(name)').eq('is_published', true).order('created_at', { ascending: false }).then(({ data }) => { if (data?.length) setItems(data.map((item: any) => ({ ...item, category: item.category?.name }))) }) }, [])
+  useEffect(() => {
+    const client = supabase
+    if (!client) return
+    let active = true
+    const load = async () => {
+      const { data, error } = await client.from('profiles').select('*, category:categories(name)').eq('is_published', true).order('created_at', { ascending: false })
+      if (error) { console.error('Could not load published profiles:', error); return }
+      if (active) setItems((data || []).map((item: any) => ({ ...item, category: Array.isArray(item.category) ? item.category[0]?.name : item.category?.name })))
+    }
+    void load()
+    const channel = client.channel('public-profiles-live').on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => { void load() }).subscribe()
+    return () => { active = false; void client.removeChannel(channel) }
+  }, [])
   return { profiles: items, setProfiles: setItems }
 }
 
