@@ -45,7 +45,7 @@ export default function AdminWorkspace() {
     const channel = client.channel('admin-workspace-live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => { void load() })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'site_content' }, () => { void load() })
-      .subscribe()
+      .subscribe(status => { if (status === 'SUBSCRIBED') void load() })
     return () => { void client.removeChannel(channel) }
   }, [])
 

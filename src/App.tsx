@@ -22,7 +22,9 @@ function useProfiles() {
       if (active) setItems((data || []).map((item: any) => ({ ...item, category: Array.isArray(item.category) ? item.category[0]?.name : item.category?.name })))
     }
     void load()
-    const channel = client.channel('public-profiles-live').on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => { void load() }).subscribe()
+    const channel = client.channel('public-profiles-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => { void load() })
+      .subscribe(status => { if (status === 'SUBSCRIBED') void load() })
     return () => { active = false; void client.removeChannel(channel) }
   }, [])
   return { profiles: items, setProfiles: setItems }

@@ -20,7 +20,9 @@ export function useSiteContent() {
       if (active && data) setContent(current => ({ ...current, ...Object.fromEntries(data.map(row => [row.key, row.value])) }))
     }
     void load()
-    const channel = client.channel('public-site-content-live').on('postgres_changes', { event: '*', schema: 'public', table: 'site_content' }, () => { void load() }).subscribe()
+    const channel = client.channel('public-site-content-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'site_content' }, () => { void load() })
+      .subscribe(status => { if (status === 'SUBSCRIBED') void load() })
     return () => { active = false; void client.removeChannel(channel) }
   }, [])
   return content
