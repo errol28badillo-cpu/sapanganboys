@@ -62,6 +62,23 @@ alter table public.admin_users enable row level security;
 alter table public.events enable row level security;
 alter table public.site_content enable row level security;
 
+drop policy if exists "Published profiles are public" on public.profiles;
+drop policy if exists "Admins can read all profiles" on public.profiles;
+drop policy if exists "Admins can create profiles" on public.profiles;
+drop policy if exists "Admins can update profiles" on public.profiles;
+drop policy if exists "Admins can delete profiles" on public.profiles;
+drop policy if exists "Categories are public for directory filters" on public.categories;
+drop policy if exists "Admins manage categories" on public.categories;
+drop policy if exists "Admins can read their own admin record" on public.admin_users;
+drop policy if exists "Published events are public" on public.events;
+drop policy if exists "Admins manage events" on public.events;
+drop policy if exists "Public site content is readable" on public.site_content;
+drop policy if exists "Admins manage site content" on public.site_content;
+drop policy if exists "Public profile images are viewable" on storage.objects;
+drop policy if exists "Admins manage profile images" on storage.objects;
+drop policy if exists "Public event images are viewable" on storage.objects;
+drop policy if exists "Admins manage event images" on storage.objects;
+
 create policy "Published profiles are public" on public.profiles for select to anon, authenticated using (is_published = true);
 create policy "Admins can read all profiles" on public.profiles for select to authenticated using (exists (select 1 from public.admin_users where user_id = (select auth.uid())));
 create policy "Admins can create profiles" on public.profiles for insert to authenticated with check (exists (select 1 from public.admin_users where user_id = (select auth.uid())) and (is_published = false or consent_confirmed = true));
