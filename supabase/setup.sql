@@ -30,6 +30,52 @@ create table if not exists public.profiles (
 );
 
 alter table public.profiles add column if not exists gallery_urls text[] not null default '{}';
+alter table public.profiles add column if not exists nickname text;
+alter table public.profiles add column if not exists location text default 'Sapangan';
+alter table public.profiles add column if not exists favorite_sport text;
+alter table public.profiles add column if not exists favorite_music text;
+alter table public.profiles add column if not exists fun_facts text[] not null default '{}';
+alter table public.profiles add column if not exists featured boolean not null default false;
+alter table public.profiles add column if not exists views integer not null default 0;
+
+create table if not exists public.admin_users (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.events (
+  id uuid primary key default uuid_generate_v4(),
+  title text not null,
+  description text not null default '',
+  date date not null,
+  time text,
+  location text,
+  image_url text,
+  is_published boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.events add column if not exists updated_at timestamptz not null default now();
+
+alter table public.events enable row level security;
+drop policy if exists "Published events are public" on public.events;
+drop policy if exists "Admins can manage events" on public.events;
+create policy "Published events are public" on public.events for select to anon, authenticated using (is_published = true);
+create policy "Admins can manage events" on public.events for all to authenticated using (exists (select 1 from public.admin_users where user_id = (select auth.uid()))) with check (exists (select 1 from public.admin_users where user_id = (select auth.uid())));
+grant select on public.events to anon, authenticated;
+grant insert, update, delete on public.events to authenticated;
+
+create or replace function public.increment_profile_view(profile_id uuid)
+returns void
+language sql
+security definer
+set search_path = public, pg_temp
+as $$
+  update public.profiles set views = views + 1 where id = profile_id and is_published = true;
+$$;
+revoke all on function public.increment_profile_view(uuid) from public;
+grant execute on function public.increment_profile_view(uuid) to anon, authenticated;
 
 create table if not exists public.admin_users (
   user_id uuid primary key references auth.users(id) on delete cascade,
@@ -177,6 +223,12 @@ begin
   ) then
     alter publication supabase_realtime add table public.site_content;
   end if;
+  if not exists (
+    select 1 from pg_publication_rel pr join pg_publication p on p.oid = pr.prpubid join pg_class c on c.oid = pr.prrelid join pg_namespace n on n.oid = c.relnamespace
+    where p.pubname = 'supabase_realtime' and n.nspname = 'public' and c.relname = 'events'
+  ) then
+    alter publication supabase_realtime add table public.events;
+  end if;
 end $$;
 
 do $$
@@ -185,7 +237,47 @@ begin
     insert into storage.buckets (id, name, public)
     values ('profile-images', 'profile-images', true);
   end if;
+  if not exists (select 1 from storage.buckets where id = 'event-images') then
+    insert into storage.buckets (id, name, public)
+    values ('event-images', 'event-images', true);
+  end if;
 end $$;
+
+drop policy if exists "Public event images are viewable" on storage.objects;
+drop policy if exists "Admins can upload event images" on storage.objects;
+drop policy if exists "Admins can update event images" on storage.objects;
+drop policy if exists "Admins can delete event images" on storage.objects;
+
+create policy "Public event images are viewable"
+on storage.objects for select to anon, authenticated
+using (bucket_id = 'event-images');
+
+create policy "Admins can upload event images"
+on storage.objects for insert to authenticated
+with check (
+  bucket_id = 'event-images'
+  and exists (select 1 from public.admin_users where user_id = (select auth.uid()))
+);
+
+create policy "Admins can update event images"
+on storage.objects for update to authenticated
+using (
+  bucket_id = 'event-images'
+  and exists (select 1 from public.admin_users where user_id = (select auth.uid()))
+)
+with check (bucket_id = 'event-images');
+
+create policy "Admins can delete event images"
+on storage.objects for delete to authenticated
+using (
+  bucket_id = 'event-images'
+  and exists (select 1 from public.admin_users where user_id = (select auth.uid()))
+);
+
+drop policy if exists "Public profile images are viewable" on storage.objects;
+drop policy if exists "Admins can upload profile images" on storage.objects;
+drop policy if exists "Admins can update profile images" on storage.objects;
+drop policy if exists "Admins can delete profile images" on storage.objects;
 
 create policy "Public profile images are viewable"
 on storage.objects for select to anon, authenticated
