@@ -75,7 +75,7 @@ function usePublicProfiles(): LoadableProfiles {
       if (!active) return
       if (requestError) {
         setError(requestError.message)
-        setProfiles([])
+        setProfiles(seedProfiles.filter(profile => profile.is_published))
       } else {
         setError('')
         setProfiles(((data || []) as SupabaseProfileRow[]).map(normalizeProfile))
@@ -219,7 +219,7 @@ function SectionTitle({ icon, kicker, title, action }: { icon?: ReactNode; kicke
   </div>
 }
 
-function ProfileGallery({ profile, detail = false, onOpen }: { profile: Profile; detail?: boolean; onOpen?: (image: string) => void }) {
+function ProfileGallery({ profile, detail = false, onOpen, onImageClick }: { profile: Profile; detail?: boolean; onOpen?: (image: string) => void; onImageClick?: () => void }) {
   const images = profileImages(profile)
   const [active, setActive] = useState(0)
 
@@ -234,7 +234,7 @@ function ProfileGallery({ profile, detail = false, onOpen }: { profile: Profile;
   const move = (direction: number) => setActive(index => (index + direction + images.length) % images.length)
 
   return <div className={detail ? 'profile-gallery detail-gallery' : 'profile-gallery'}>
-    <button className="gallery-image-button" type="button" onClick={() => onOpen?.(image)} aria-label={`Open ${profile.display_name} photo`}>
+    <button className="gallery-image-button" type="button" onClick={() => { onOpen?.(image); onImageClick?.() }} aria-label={`Open ${profile.display_name} photo`}>
       <PublicImage src={image} name={profile.display_name} />
     </button>
     {images.length > 1 && <>
@@ -248,11 +248,12 @@ function ProfileGallery({ profile, detail = false, onOpen }: { profile: Profile;
 
 function ProfileCard({ profile }: { profile: Profile }) {
   const facebook = facebookUrl(profile.social_links?.facebook)
+  const navigate = useNavigate()
   return <article className="discovery-card">
-    <Link to={`/profile/${profile.id}`} className="discovery-photo">
-      <ProfileGallery profile={profile} />
+    <div className="discovery-photo">
+      <ProfileGallery profile={profile} onImageClick={() => navigate(`/profile/${profile.id}`)} />
       {profile.featured && <span className="featured-badge"><Star size={12} /> Featured</span>}
-    </Link>
+    </div>
     <div className="discovery-card-body">
       <span className="location"><MapPin size={13} /> {profile.location || 'Sapangan'}</span>
       <h3>{profile.nickname || profile.display_name}</h3>
