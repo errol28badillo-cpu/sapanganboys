@@ -56,11 +56,24 @@ create table if not exists public.site_content (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.profile_feedback (
+  id uuid primary key default uuid_generate_v4(),
+  profile_id uuid not null references public.profiles(id) on delete cascade,
+  username text not null check (char_length(username) between 3 and 32),
+  gender text not null check (gender in ('male', 'female')),
+  rating integer not null check (rating between 1 and 5),
+  message text not null check (char_length(message) between 3 and 500),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists profile_feedback_profile_id_created_at_idx on public.profile_feedback (profile_id, created_at desc);
+
 alter table public.categories enable row level security;
 alter table public.profiles enable row level security;
 alter table public.admin_users enable row level security;
 alter table public.events enable row level security;
 alter table public.site_content enable row level security;
+alter table public.profile_feedback enable row level security;
 
 drop policy if exists "Published profiles are public" on public.profiles;
 drop policy if exists "Admins can read all profiles" on public.profiles;
@@ -74,6 +87,8 @@ drop policy if exists "Published events are public" on public.events;
 drop policy if exists "Admins manage events" on public.events;
 drop policy if exists "Public site content is readable" on public.site_content;
 drop policy if exists "Admins manage site content" on public.site_content;
+drop policy if exists "Public feedback is readable" on public.profile_feedback;
+drop policy if exists "Anyone can submit profile feedback" on public.profile_feedback;
 drop policy if exists "Public profile images are viewable" on storage.objects;
 drop policy if exists "Admins manage profile images" on storage.objects;
 drop policy if exists "Public event images are viewable" on storage.objects;
@@ -91,8 +106,11 @@ create policy "Published events are public" on public.events for select to anon,
 create policy "Admins manage events" on public.events for all to authenticated using (exists (select 1 from public.admin_users where user_id = (select auth.uid()))) with check (exists (select 1 from public.admin_users where user_id = (select auth.uid())));
 create policy "Public site content is readable" on public.site_content for select to anon, authenticated using (true);
 create policy "Admins manage site content" on public.site_content for all to authenticated using (exists (select 1 from public.admin_users where user_id = (select auth.uid()))) with check (exists (select 1 from public.admin_users where user_id = (select auth.uid())));
+create policy "Public feedback is readable" on public.profile_feedback for select to anon, authenticated using (true);
+create policy "Anyone can submit profile feedback" on public.profile_feedback for insert to anon, authenticated with check (exists (select 1 from public.profiles where id = profile_id and is_published = true));
 
 grant select on public.categories, public.profiles, public.events, public.site_content to anon, authenticated;
+grant select, insert on public.profile_feedback to anon, authenticated;
 grant insert, update, delete on public.profiles, public.categories, public.events, public.site_content to authenticated;
 
 create or replace function public.increment_profile_view(profile_id uuid)

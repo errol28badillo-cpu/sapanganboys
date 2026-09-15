@@ -5,7 +5,7 @@ import { ArrowRight, ArrowUpRight, CalendarDays, Facebook, Flame, MapPin, Menu, 
 import { profiles as seedProfiles } from './data'
 import { supabase } from './lib/supabase'
 import { useSiteContent } from './lib/siteContent'
-import type { CommunityEvent, Profile } from './types'
+import type { CommunityEvent, Profile, ProfileFeedback as ProfileFeedbackEntry } from './types'
 
 type LoadableProfiles = {
   profiles: Profile[]
@@ -20,6 +20,43 @@ type SupabaseProfileRow = Omit<Profile, 'category'> & {
 const fallbackAvatar = (name: string) => `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'Sapangan Boy')}&background=d7e5db&color=183d34&size=900`
 const defaultInterests = ['Basketball', 'Gaming', 'Music', 'Motorcycles', 'Photography', 'Sports', 'Art', 'Technology', 'Fitness']
 const formatDate = (date: string) => new Intl.DateTimeFormat('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(date))
+const usernameParts = ['Sunny', 'Kind', 'Brave', 'Calm', 'Swift', 'Bright', 'Cool', 'Mellow']
+const usernameNouns = ['Explorer', 'Neighbor', 'Listener', 'Creator', 'Friend', 'Local', 'Walker', 'Dreamer']
+
+type VisitorIdentity = { gender: 'male' | 'female'; username: string }
+
+function randomUsername() {
+  const part = usernameParts[Math.floor(Math.random() * usernameParts.length)]
+  const noun = usernameNouns[Math.floor(Math.random() * usernameNouns.length)]
+  return `${part}${noun}${Math.floor(100 + Math.random() * 900)}`
+}
+
+function useVisitorIdentity() {
+  const [identity, setIdentity] = useState<VisitorIdentity | null>(() => {
+    try {
+      const stored = localStorage.getItem('sapangan-visitor')
+      return stored ? JSON.parse(stored) as VisitorIdentity : null
+    } catch {
+      return null
+    }
+  })
+
+  const saveIdentity = (value: VisitorIdentity) => {
+    localStorage.setItem('sapangan-visitor', JSON.stringify(value))
+    setIdentity(value)
+  }
+
+  return { identity, saveIdentity }
+}
+
+function readVisitorIdentity() {
+  try {
+    const stored = localStorage.getItem('sapangan-visitor')
+    return stored ? JSON.parse(stored) as VisitorIdentity : null
+  } catch {
+    return null
+  }
+}
 
 function normalizeProfile(item: SupabaseProfileRow): Profile {
   const category = Array.isArray(item.category) ? item.category[0]?.name : item.category?.name
@@ -202,11 +239,86 @@ function PublicFooter() {
 }
 
 function PublicShell({ children }: { children: ReactNode }) {
+  const visitor = useVisitorIdentity()
+  const [username, setUsername] = useState(randomUsername)
+
+  const chooseIdentity = (gender: VisitorIdentity['gender']) => visitor.saveIdentity({ gender, username: username.trim() || randomUsername() })
+
   return <>
     <PublicHeader />
     {children}
     <PublicFooter />
+    {!visitor.identity && <div className="visitor-backdrop"><section className="visitor-modal" role="dialog" aria-modal="true" aria-labelledby="visitor-title">
+      <span className="eyebrow">Welcome to Sapangan</span>
+      <h2 id="visitor-title">How should we know you?</h2>
+      <p>Choose an identity and a display name for ratings and feedback. You can change this later in your browser.</p>
+      <label className="visitor-name">Username<input value={username} onChange={event => setUsername(event.target.value.slice(0, 32))} maxLength={32} /></label>
+      <div className="visitor-actions"><button className="button button-dark" type="button" onClick={() => chooseIdentity('male')}>Male</button><button className="button button-outline" type="button" onClick={() => chooseIdentity('female')}>Female</button></div>
+      <small>Your username is shown with any feedback you submit.</small>
+    </section></div>}
   </>
+}
+
+function ProfileFeedback({ profileId }: { profileId: string }) {
+  const visitor = useVisitorIdentity()
+  const [feedback, setFeedback] = useState<ProfileFeedbackEntry[]>([])
+  const [rating, setRating] = useState(5)
+  const [message, setMessage] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [submitted, setSubmitted] = useState(false)
+
+  useEffect(() => {
+    const load = async () => {
+      if (!supabase) {
+        try { setFeedback(JSON.parse(localStorage.getItem(`sapangan-feedback:${profileId}`) || '[]') as ProfileFeedbackEntry[]) } catch { setFeedback([]) }
+        setLoading(false)
+        return
+      }
+      const result = await supabase.from('profile_feedback').select('*').eq('profile_id', profileId).order('created_at', { ascending: false })
+      if (result.error) setError(result.error.message)
+      else setFeedback((result.data || []) as ProfileFeedbackEntry[])
+      setLoading(false)
+    }
+    void load()
+  }, [profileId])
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault()
+    const identity = visitor.identity || readVisitorIdentity()
+    if (!identity || message.trim().length < 3) return
+    setSaving(true)
+    setError('')
+    const payload = { profile_id: profileId, username: identity.username, gender: identity.gender, rating, message: message.trim() }
+    if (supabase) {
+      const result = await supabase.from('profile_feedback').insert(payload).select().single()
+      if (result.error) setError(result.error.message)
+      else { setFeedback(items => [result.data as ProfileFeedbackEntry, ...items]); setMessage(''); setSubmitted(true) }
+    } else {
+      const item: ProfileFeedbackEntry = { ...payload, id: crypto.randomUUID(), created_at: new Date().toISOString() }
+      const items = [item, ...feedback]
+      localStorage.setItem(`sapangan-feedback:${profileId}`, JSON.stringify(items))
+      setFeedback(items)
+      setMessage('')
+      setSubmitted(true)
+    }
+    setSaving(false)
+  }
+
+  const average = feedback.length ? feedback.reduce((sum, item) => sum + item.rating, 0) / feedback.length : 0
+
+  return <section className="feedback-panel">
+    <div className="feedback-heading"><div><span className="eyebrow">Community feedback</span><h2>Rate and share a thought.</h2></div>{feedback.length > 0 && <div className="feedback-average"><b>{average.toFixed(1)}</b><span>{Array.from({ length: 5 }, (_, index) => <Star key={index} size={14} fill={index < Math.round(average) ? 'currentColor' : 'none'} />)}</span><small>{feedback.length} response{feedback.length === 1 ? '' : 's'}</small></div>}</div>
+    <form className="feedback-form" onSubmit={submit}>
+      <div className="rating-picker" aria-label="Choose a rating">{Array.from({ length: 5 }, (_, index) => <button key={index} type="button" aria-label={`${index + 1} stars`} className={index < rating ? 'selected' : ''} onClick={() => setRating(index + 1)}><Star size={22} fill="currentColor" /></button>)}</div>
+      <textarea value={message} onChange={event => setMessage(event.target.value)} maxLength={500} minLength={3} placeholder="Write feedback about this profile..." required />
+      <div className="feedback-form-footer"><small>Posting as <b>{visitor.identity?.username || 'visitor'}</b></small><button className="button button-dark" type="submit" disabled={saving}>{saving ? 'Posting...' : 'Post feedback'} <ArrowRight size={15} /></button></div>
+      {submitted && <small className="feedback-success">Thanks for sharing your feedback.</small>}
+      {error && <small className="form-error">{error}</small>}
+    </form>
+    {!loading && feedback.length > 0 && <div className="feedback-list">{feedback.map(item => <article key={item.id}><div className="feedback-item-head"><b>{item.username}</b><span>{Array.from({ length: 5 }, (_, index) => <Star key={index} size={12} fill={index < item.rating ? 'currentColor' : 'none'} />)}</span></div><p>{item.message}</p><small>{formatDate(item.created_at)}</small></article>)}</div>}
+  </section>
 }
 
 function SectionTitle({ icon, kicker, title, action }: { icon?: ReactNode; kicker: string; title: string; action?: ReactNode }) {
@@ -456,6 +568,7 @@ export function BoyProfilePage() {
         <small>Added {formatDate(profile.created_at)}</small>
       </div>
     </div>
+    <ProfileFeedback profileId={profile.id} />
     {lightbox && <div className="lightbox" onClick={() => setLightbox('')}>
       <button type="button" aria-label="Close gallery"><X size={18} /></button>
       <img src={lightbox} alt={`${profile.display_name} gallery`} />

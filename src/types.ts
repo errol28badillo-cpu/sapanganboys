@@ -41,6 +41,16 @@ export type CommunityEvent = {
   updated_at?: string
 }
 
+export type ProfileFeedback = {
+  id: string
+  profile_id: string
+  username: string
+  gender: 'male' | 'female'
+  rating: number
+  message: string
+  created_at: string
+}
+
 export type SiteContent = {
   boys_intro: string
   about_heading: string

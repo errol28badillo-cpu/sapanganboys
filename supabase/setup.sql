@@ -88,6 +88,18 @@ create table if not exists public.site_content (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.profile_feedback (
+  id uuid primary key default uuid_generate_v4(),
+  profile_id uuid not null references public.profiles(id) on delete cascade,
+  username text not null check (char_length(username) between 3 and 32),
+  gender text not null check (gender in ('male', 'female')),
+  rating integer not null check (rating between 1 and 5),
+  message text not null check (char_length(message) between 3 and 500),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists profile_feedback_profile_id_created_at_idx on public.profile_feedback (profile_id, created_at desc);
+
 insert into public.site_content (key, value) values
   ('boys_intro', 'Browse the faces, interests, and stories of our community.'),
   ('about_heading', 'Small place. Big character.'),
@@ -111,6 +123,7 @@ alter table public.categories enable row level security;
 alter table public.profiles enable row level security;
 alter table public.admin_users enable row level security;
 alter table public.site_content enable row level security;
+alter table public.profile_feedback enable row level security;
 
 -- Remove policies from earlier versions before applying the restricted ones.
 drop policy if exists "Published profiles are public" on public.profiles;
@@ -128,6 +141,8 @@ drop policy if exists "Admins can delete categories" on public.categories;
 drop policy if exists "Admins can read their own admin record" on public.admin_users;
 drop policy if exists "Public site content is readable" on public.site_content;
 drop policy if exists "Admins can manage site content" on public.site_content;
+drop policy if exists "Public feedback is readable" on public.profile_feedback;
+drop policy if exists "Anyone can submit profile feedback" on public.profile_feedback;
 drop policy if exists "Public profile images are viewable" on storage.objects;
 drop policy if exists "Admins upload profile images" on storage.objects;
 drop policy if exists "Admins update profile images" on storage.objects;
@@ -149,6 +164,14 @@ create policy "Admins can manage site content"
 on public.site_content for all to authenticated
 using (exists (select 1 from public.admin_users where user_id = (select auth.uid())))
 with check (exists (select 1 from public.admin_users where user_id = (select auth.uid())));
+
+create policy "Public feedback is readable"
+on public.profile_feedback for select to anon, authenticated
+using (true);
+
+create policy "Anyone can submit profile feedback"
+on public.profile_feedback for insert to anon, authenticated
+with check (exists (select 1 from public.profiles where id = profile_id and is_published = true));
 
 create policy "Published profiles are public"
 on public.profiles for select to anon, authenticated
@@ -200,6 +223,7 @@ grant select on public.profiles to anon, authenticated;
 grant insert, update, delete on public.profiles to authenticated;
 grant insert, update, delete on public.categories to authenticated;
 grant select on public.site_content to anon, authenticated;
+grant select, insert on public.profile_feedback to anon, authenticated;
 grant insert, update, delete on public.site_content to authenticated;
 
 -- Enable Supabase Realtime for public profiles and editable site text.
