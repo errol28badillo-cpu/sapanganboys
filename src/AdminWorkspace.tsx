@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowDown, ArrowUp, ArrowUpRight, BarChart3, CalendarDays, Check, Edit3, Eye, EyeOff, ImagePlus, Plus, Save, Settings, ShieldCheck, Star, Trash2, Upload, Users, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpRight, BarChart3, CalendarDays, Check, Edit3, Eye, EyeOff, ImagePlus, Plus, Save, Settings, ShieldCheck, Star, Trash2, Upload, Users, Video, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import type { CommunityEvent, Profile, SiteContent } from './types'
@@ -22,6 +22,7 @@ type ProfileForm = {
   fun_facts: string
   facebook: string
   profile_image_url: string
+  video_url: string
   gallery_urls: string[]
   featured: boolean
   is_published: boolean
@@ -59,6 +60,7 @@ const emptyProfile: ProfileForm = {
   fun_facts: '',
   facebook: '',
   profile_image_url: '',
+  video_url: '',
   gallery_urls: [],
   featured: false,
   is_published: false,
@@ -95,6 +97,7 @@ function profileToForm(profile?: Profile): ProfileForm {
     fun_facts: joinList(profile.fun_facts),
     facebook: profile.social_links?.facebook || '',
     profile_image_url: profile.profile_image_url || '',
+    video_url: profile.video_url || '',
     gallery_urls: profile.gallery_urls || [],
     featured: Boolean(profile.featured),
     is_published: profile.is_published,
@@ -155,6 +158,7 @@ export default function AdminWorkspace({ section = 'dashboard' }: { section?: Ad
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null)
   const [profileForm, setProfileForm] = useState<ProfileForm>(profileToForm())
   const [profileFiles, setProfileFiles] = useState<File[]>([])
+  const [profileVideoFile, setProfileVideoFile] = useState<File | null>(null)
   const [eventEditorOpen, setEventEditorOpen] = useState(false)
   const [editingEvent, setEditingEvent] = useState<CommunityEvent | null>(null)
   const [eventForm, setEventForm] = useState<EventForm>(eventToForm())
@@ -218,6 +222,7 @@ export default function AdminWorkspace({ section = 'dashboard' }: { section?: Ad
     setEditingProfile(profile || null)
     setProfileForm(profileToForm(profile))
     setProfileFiles([])
+    setProfileVideoFile(null)
     setProfileEditorOpen(true)
   }
 
@@ -253,6 +258,15 @@ export default function AdminWorkspace({ section = 'dashboard' }: { section?: Ad
 
     const gallery = unique([...profileForm.gallery_urls, ...upload.urls]).slice(0, 20)
     const imageUrl = profileForm.profile_image_url || gallery[0] || ''
+    let videoUrl = profileForm.video_url.trim()
+    if (profileVideoFile) {
+      const videoUpload = await uploadImages('profile-images', 'profile-videos', [profileVideoFile])
+      if (videoUpload.error) {
+        notify(videoUpload.error)
+        return
+      }
+      videoUrl = videoUpload.urls[0] || videoUrl
+    }
     const payload = {
       display_name: profileForm.display_name.trim(),
       nickname: optional(profileForm.nickname),
@@ -260,6 +274,7 @@ export default function AdminWorkspace({ section = 'dashboard' }: { section?: Ad
       bio: profileForm.bio.trim(),
       location: optional(profileForm.location) || 'Sapangan',
       profile_image_url: imageUrl,
+      video_url: videoUrl || null,
       gallery_urls: gallery,
       hobbies: splitList(profileForm.hobbies),
       interests: splitList(profileForm.interests),
@@ -287,6 +302,7 @@ export default function AdminWorkspace({ section = 'dashboard' }: { section?: Ad
     setEditingProfile(null)
     setProfileForm(profileToForm())
     setProfileFiles([])
+    setProfileVideoFile(null)
     await load()
   }
 
@@ -438,8 +454,10 @@ export default function AdminWorkspace({ section = 'dashboard' }: { section?: Ad
           <label>Favorite sport<input value={profileForm.favorite_sport} onChange={event => updateProfileForm('favorite_sport', event.target.value)} /></label>
           <label>Favorite music<input value={profileForm.favorite_music} onChange={event => updateProfileForm('favorite_music', event.target.value)} /></label>
           <label className="span-2">Fun facts<input placeholder="Comma-separated facts" value={profileForm.fun_facts} onChange={event => updateProfileForm('fun_facts', event.target.value)} /></label>
-          <label className="span-2">Primary image URL<input value={profileForm.profile_image_url} onChange={event => updateProfileForm('profile_image_url', event.target.value)} /></label>
+          <label>Primary image URL<input value={profileForm.profile_image_url} onChange={event => updateProfileForm('profile_image_url', event.target.value)} /></label>
+          <label>Profile video URL<input type="url" placeholder="https://.../video.mp4" value={profileForm.video_url} onChange={event => updateProfileForm('video_url', event.target.value)} /></label>
         </div>
+        <div className="video-manager"><div className="panel-head compact-head"><div><span className="eyebrow">Profile video</span><h3>Optional introduction</h3></div><label className="upload-inline"><Video size={15} /> Upload video<input type="file" accept="video/mp4,video/webm,video/quicktime" onChange={event => setProfileVideoFile(event.target.files?.[0] || null)} /></label></div>{profileForm.video_url && <video className="admin-video-preview" src={profileForm.video_url} controls preload="metadata" />}{profileVideoFile && <p className="upload-note">{profileVideoFile.name} ready to upload.</p>}<small className="field-help">Use a short, consent-approved introduction video. MP4 or WebM works best.</small></div>
         <div className="gallery-manager">
           <div className="panel-head compact-head"><div><span className="eyebrow">Photo gallery</span><h3>Public images</h3></div><label className="upload-inline"><Upload size={15} /> Upload<input type="file" multiple accept="image/png,image/jpeg,image/webp" onChange={event => setProfileFiles(Array.from(event.target.files || []))} /></label></div>
           <div className="admin-gallery-list">

@@ -564,6 +564,7 @@ export function BoyProfilePage() {
           <div><b>Favorite music</b><p>{profile.favorite_music || 'Not added yet'}</p></div>
         </div>
         {facts.length > 0 && <div className="fun-facts"><b>Fun facts</b>{facts.map(fact => <p key={fact}>{fact}</p>)}</div>}
+        {profile.video_url && <div className="profile-video"><span className="eyebrow">Profile video</span><video src={profile.video_url} controls preload="metadata" playsInline /></div>}
         {facebook && <a className="button button-dark social-profile-link" href={facebook} target="_blank" rel="noreferrer"><Facebook size={17} /> Connect on Facebook <ArrowUpRight size={15} /></a>}
         <small>Added {formatDate(profile.created_at)}</small>
       </div>

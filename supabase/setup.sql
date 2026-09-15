@@ -30,6 +30,7 @@ create table if not exists public.profiles (
 );
 
 alter table public.profiles add column if not exists gallery_urls text[] not null default '{}';
+alter table public.profiles add column if not exists video_url text;
 alter table public.profiles add column if not exists nickname text;
 alter table public.profiles add column if not exists location text default 'Sapangan';
 alter table public.profiles add column if not exists favorite_sport text;

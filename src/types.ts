@@ -7,6 +7,7 @@ export type Profile = {
   short_description: string
   bio: string
   profile_image_url: string
+  video_url?: string | null
   gallery_urls?: string[] | null
   location?: string | null
   hobbies: string[]
