@@ -8,6 +8,43 @@ import { supabase } from './lib/supabase'
 import { AboutPage, BoyProfilePage, BoysDirectory, ContactPage, EventsPage, PublicHome } from './PublicPages'
 
 type AdminStatus = 'checking' | 'allowed' | 'signed-out' | 'blocked'
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>
+}
+
+function InstallPrompt() {
+  const [prompt, setPrompt] = useState<BeforeInstallPromptEvent | null>(null)
+  const [dismissed, setDismissed] = useState(() => localStorage.getItem('sapangan-install-dismissed') === '1')
+
+  useEffect(() => {
+    const handlePrompt = (event: Event) => {
+      event.preventDefault()
+      setPrompt(event as BeforeInstallPromptEvent)
+    }
+    window.addEventListener('beforeinstallprompt', handlePrompt)
+    return () => window.removeEventListener('beforeinstallprompt', handlePrompt)
+  }, [])
+
+  if (!prompt) return null
+
+  const install = async () => {
+    await prompt.prompt()
+    setPrompt(null)
+  }
+
+  const dismiss = () => {
+    localStorage.setItem('sapangan-install-dismissed', '1')
+    setDismissed(true)
+  }
+
+  if (dismissed) return null
+
+  return <aside className="install-notice" role="dialog" aria-label="Install Sapangan Boys">
+    <div className="install-notice-icon">SB</div>
+    <div className="install-notice-copy"><strong>Install Sapangan Boys?</strong><span>Keep the community directory on your device.</span></div>
+    <div className="install-notice-actions"><button className="install-confirm" type="button" onClick={() => void install()}>Install</button><button className="install-dismiss" type="button" onClick={dismiss}>Not now</button></div>
+  </aside>
+}
 
 function AdminLogin() {
   const nav = useNavigate()
@@ -127,23 +164,23 @@ function AdminPage({ section }: { section: AdminSection }) {
 }
 
 export default function App() {
-  return <Routes>
-    <Route path="/" element={<PublicHome />} />
-    <Route path="/boys" element={<BoysDirectory />} />
-    <Route path="/profile/:id" element={<BoyProfilePage />} />
-    <Route path="/events" element={<EventsPage />} />
-    <Route path="/about" element={<AboutPage />} />
-    <Route path="/contact" element={<ContactPage />} />
-    <Route path="/admin/login" element={<AdminLogin />} />
-    <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
-    <Route path="/admin/dashboard" element={<AdminPage section="dashboard" />} />
-    <Route path="/admin/boys" element={<AdminPage section="boys" />} />
-    <Route path="/admin/events" element={<AdminPage section="events" />} />
-    <Route path="/admin/settings" element={<AdminPage section="settings" />} />
-    <Route path="/admin/manage" element={<Navigate to="/admin/boys" replace />} />
-    <Route path="/admin/profiles" element={<Navigate to="/admin/boys" replace />} />
-    <Route path="/admin/profiles/new" element={<Navigate to="/admin/boys" replace />} />
-    <Route path="/admin/categories" element={<Navigate to="/admin/settings" replace />} />
-    <Route path="*" element={<Navigate to="/" replace />} />
-  </Routes>
+  return <><InstallPrompt /><Routes>
+      <Route path="/" element={<PublicHome />} />
+      <Route path="/boys" element={<BoysDirectory />} />
+      <Route path="/profile/:id" element={<BoyProfilePage />} />
+      <Route path="/events" element={<EventsPage />} />
+      <Route path="/about" element={<AboutPage />} />
+      <Route path="/contact" element={<ContactPage />} />
+      <Route path="/admin/login" element={<AdminLogin />} />
+      <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+      <Route path="/admin/dashboard" element={<AdminPage section="dashboard" />} />
+      <Route path="/admin/boys" element={<AdminPage section="boys" />} />
+      <Route path="/admin/events" element={<AdminPage section="events" />} />
+      <Route path="/admin/settings" element={<AdminPage section="settings" />} />
+      <Route path="/admin/manage" element={<Navigate to="/admin/boys" replace />} />
+      <Route path="/admin/profiles" element={<Navigate to="/admin/boys" replace />} />
+      <Route path="/admin/profiles/new" element={<Navigate to="/admin/boys" replace />} />
+      <Route path="/admin/categories" element={<Navigate to="/admin/settings" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes></>
 }

@@ -1,0 +1,20 @@
+{
+  "name": "Sapangan Boys",
+  "short_name": "Sapangan Boys",
+  "description": "Meet the community of Sapangan, San Juan, Batangas.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#eceeef",
+  "theme_color": "#343a40",
+  "categories": ["social", "lifestyle"],
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
