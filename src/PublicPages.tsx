@@ -347,13 +347,13 @@ function ProfileGallery({ profile, detail = false, onOpen, onImageClick }: { pro
 
   return <div className={detail ? 'profile-gallery detail-gallery' : 'profile-gallery'}>
     <button className="gallery-image-button" type="button" onClick={() => { onOpen?.(image); onImageClick?.() }} aria-label={`Open ${profile.display_name} photo`}>
-      <PublicImage src={image} name={profile.display_name} />
+      <PublicImage src={image} name={profile.display_name} className="gallery-main-image" />
     </button>
     {images.length > 1 && <>
       <button className="gallery-control gallery-prev" type="button" onClick={event => { event.preventDefault(); move(-1) }} aria-label="Previous image">‹</button>
       <button className="gallery-control gallery-next" type="button" onClick={event => { event.preventDefault(); move(1) }} aria-label="Next image">›</button>
       <span className="gallery-count">{active + 1} / {images.length}</span>
-      {detail && <div className="gallery-strip">{images.map((photo, index) => <button type="button" key={photo} className={index === active ? 'gallery-thumb active' : 'gallery-thumb'} onClick={() => setActive(index)} aria-label={`Show image ${index + 1}`}><PublicImage src={photo} name={`${profile.display_name} thumbnail`} /></button>)}</div>}
+      {detail && <div className="gallery-strip">{images.map((photo, index) => <button type="button" key={photo} className={index === active ? 'gallery-thumb active' : 'gallery-thumb'} onClick={() => setActive(index)} aria-label={`Show image ${index + 1}`}><PublicImage src={photo} name={`${profile.display_name} thumbnail`} className="gallery-thumb-image" /></button>)}</div>}
     </>}
   </div>
 }
@@ -381,7 +381,7 @@ function ProfileCard({ profile }: { profile: Profile }) {
 
 function EventCard({ event }: { event: CommunityEvent }) {
   return <article className="event-card">
-    {event.image_url ? <PublicImage src={event.image_url} name={event.title} /> : <div className="event-image-empty"><CalendarDays size={26} /></div>}
+    {event.image_url ? <div className="event-image"><PublicImage src={event.image_url} name={event.title} className="event-image-photo" /></div> : <div className="event-image-empty"><CalendarDays size={26} /></div>}
     <div>
       <span className="eyebrow">{formatDate(event.date)}{event.time ? ` - ${event.time}` : ''}</span>
       <h3>{event.title}</h3>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, Navigate, NavLink, Route, Routes, useNavigate } from 'react-router-dom'
-import { ArrowRight, ArrowUpRight, CalendarDays, LayoutDashboard, LogOut, Settings, ShieldCheck, Users } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, CalendarDays, LayoutDashboard, LogOut, MessageCircle, Send, Settings, ShieldCheck, Users, X } from 'lucide-react'
 import AdminWorkspace from './AdminWorkspace'
 import type { AdminSection } from './AdminWorkspace'
 import { supabase } from './lib/supabase'
@@ -44,6 +44,44 @@ function InstallPrompt() {
     <div className="install-notice-copy"><strong>Install Sapangan Boys?</strong><span>Keep the community directory on your device.</span></div>
     <div className="install-notice-actions"><button className="install-confirm" type="button" onClick={() => void install()}>Install</button><button className="install-dismiss" type="button" onClick={dismiss}>Not now</button></div>
   </aside>
+}
+
+type ChatMessage = { role: 'user' | 'model'; text: string }
+
+function CommunityChat() {
+  const [open, setOpen] = useState(false)
+  const [input, setInput] = useState('')
+  const [sending, setSending] = useState(false)
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    { role: 'model', text: 'Hi! Ask me about Sapangan Boys, profiles, interests, events, or how this directory works.' },
+  ])
+
+  const send = async (event: React.FormEvent) => {
+    event.preventDefault()
+    const text = input.trim()
+    if (!text || sending) return
+    setInput('')
+    setMessages(items => [...items, { role: 'user', text }])
+    setSending(true)
+    try {
+      const response = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: [...messages, { role: 'user', text }] }) })
+      const data = await response.json() as { reply?: string; error?: string }
+      setMessages(items => [...items, { role: 'model', text: data.reply || data.error || 'I could not answer that right now.' }])
+    } catch {
+      setMessages(items => [...items, { role: 'model', text: 'The community assistant is temporarily unavailable. Please try again shortly.' }])
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return <>
+    {open && <section className="chat-panel" aria-label="Sapangan Boys assistant">
+      <header className="chat-header"><div><strong>Sapangan Assistant</strong><span>Ask in any language</span></div><button type="button" onClick={() => setOpen(false)} aria-label="Close assistant"><X size={17} /></button></header>
+      <div className="chat-messages">{messages.map((message, index) => <p key={`${message.role}-${index}`} className={`chat-message ${message.role}`}>{message.text}</p>)}{sending && <p className="chat-message model chat-typing">Thinking...</p>}</div>
+      <form className="chat-form" onSubmit={send}><input value={input} onChange={event => setInput(event.target.value)} placeholder="Ask about the community..." aria-label="Chat message" /><button type="submit" disabled={sending || !input.trim()} aria-label="Send message"><Send size={16} /></button></form>
+    </section>}
+    <button className="chat-launcher" type="button" onClick={() => setOpen(value => !value)} aria-label={open ? 'Close assistant' : 'Open assistant'}>{open ? <X size={19} /> : <MessageCircle size={19} />}<span>{open ? 'Close' : 'Ask us'}</span></button>
+  </>
 }
 
 function AdminLogin() {
@@ -164,7 +202,7 @@ function AdminPage({ section }: { section: AdminSection }) {
 }
 
 export default function App() {
-  return <><InstallPrompt /><Routes>
+  return <><InstallPrompt /><CommunityChat /><Routes>
       <Route path="/" element={<PublicHome />} />
       <Route path="/boys" element={<BoysDirectory />} />
       <Route path="/profile/:id" element={<BoyProfilePage />} />
